@@ -9,7 +9,7 @@ use crate::{
     ruslik_pure,
     ruslik_ssl::{self, Var},
 };
-
+// 定义了几个类型别名和常量以简化代码中的某些类型的表示。
 pub(crate) type AdtIdent = rustc_span::symbol::Symbol;
 pub(crate) type FieldIdent = rustc_middle::mir::Field;
 
@@ -19,7 +19,8 @@ pub(crate) const FUT: (FieldIdent, VariantIdx) = (
     VariantIdx::from_u32(0),
 );
 pub(crate) const OLD: (FieldIdent, VariantIdx) = (FieldIdent::MAX, VariantIdx::from_u32(0));
-
+// 一个函数，根据给定的参数返回相应的字符串名称。
+// 这个函数用模式匹配来判断参数值并返回相应的字符串。
 pub(crate) fn field_to_name(f: FieldIdent, v: VariantIdx, ty: Ty) -> String {
     // println!(" [TY: {}] ", ty);
     match (f, v) {
@@ -34,6 +35,10 @@ pub(crate) fn field_to_name(f: FieldIdent, v: VariantIdx, ty: Ty) -> String {
     }
 }
 
+
+// 它包含了函数的参数、返回类型、一些与类型关联的其他信息等。
+// RuslikFnSig::new 是一个关联函数，用于根据给定的参数创建一个新的 RuslikFnSig 实例。
+// RuslikFnSig::is_trivial 是一个方法，用于判断当前的函数签名是否为"trivial"。
 #[derive(Clone)]
 pub struct RuslikFnSig<'tcx> {
     pub args: Vec<(ruslik_ssl::Var, Ty<'tcx>)>,

@@ -20,7 +20,10 @@ use crate::{
     trait_bounds::find_trait_fns,
 };
 
+// 定义一个名为PredMap的类型别名，其为一个基于HashMap的快速哈希映射，键是字符串，值是Predicate类型。
 pub type PredMap = FxHashMap<String, Predicate>;
+
+// 定义一个二进制操作的枚举类型，可以是Rust内置的或是SetContains操作
 #[derive(Debug, Copy, Clone)]
 pub enum BinOp {
     Rust(RustBinOp),
@@ -55,6 +58,7 @@ impl From<&rustc_ast::ast::LitKind> for Lit {
 }
 // pub type Lit = rustc_ast::ast::LitKind;
 
+// 定义一个描述Suslik程序的结构体，它包括断言、函数签名等
 pub struct SuslikProgram {
     pub(crate) pred_map: PredMap,
     pub(crate) extern_fns: Vec<Signature>,
@@ -62,7 +66,7 @@ pub struct SuslikProgram {
     pub(crate) synth_ast: usize,
     pub(crate) pure_fn_ast: UsedPureFns,
 }
-
+// 函数签名
 pub struct Signature {
     pub(crate) is_trivial: bool,
     pub(crate) region_rels: Vec<(String, String)>,
@@ -72,6 +76,7 @@ pub struct Signature {
     pub(crate) fn_name: String,
 }
 
+// 谓词的结构体，包括标志、标识符、事实、子句等信息
 pub struct Predicate {
     pub is_prim: bool,
     pub is_copy: bool,
@@ -84,6 +89,8 @@ pub struct Predicate {
     pub fn_spec: Vec<PredParameter>,
     pub clauses: Vec<Clause>,
 }
+
+// 子句的结构体，包括名称、选择器、等式、断言等
 pub struct Clause {
     pub name: Option<String>,
     pub prim_arg: Option<String>,
@@ -95,35 +102,40 @@ pub struct Clause {
 
 #[derive(Clone)]
 pub struct SApp {
-    pub is_private: bool,
-    pub field_name: String,
-    pub ty: STy,
+    pub is_private: bool,       // 是否为私有应用
+    pub field_name: String,     // 字段名称
+    pub ty: STy,                // 相关类型
 }
 #[derive(Clone)]
 pub struct STy {
     // pub is_opaque: bool,
-    pub is_brrw: Vec<BorrowInfo>,
-    pub pred: String, // used as index into Predicate map
-    pub fn_spec: Vec<PredArgument>,
+    pub is_brrw: Vec<BorrowInfo>, // 借用信息列表
+    pub pred: String,             // 作为Predicate map的索引使用
+    pub fn_spec: Vec<PredArgument>, // 函数参数列表
 }
+// 描述借用信息的结构体
 #[derive(Clone, Debug)]
 pub struct BorrowInfo {
-    pub lft: String,
-    pub m: rustc_hir::Mutability,
+    pub lft: String,              // 生命周期标识
+    pub m: rustc_hir::Mutability, // 可变性
 }
 
+
+// 描述函数规范类型的枚举
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum FnSpecKind {
-    Int,
-    Bool,
-    Lft,
-    Set,
-    Snap, //, Tpl
+    Int,    // 整数类型
+    Bool,   // 布尔类型
+    Lft,    // 生命周期类型
+    Set,    // 集合类型
+    Snap,   // 快照类型
+    // Tpl, 
 }
 
 impl FnSpecKind {
+    // 将Rust类型转换为FnSpecKind
     pub fn prim_to_kind<'tcx>(ty: Ty<'tcx>) -> Self {
-        match ty.kind() {
+        match ty.kind() { //[匹配的类型种类]
             TyKind::Bool => Self::Bool,
             TyKind::Char => todo!(),
             TyKind::Int(_) | TyKind::Uint(_) => Self::Int,
@@ -141,10 +153,11 @@ impl FnSpecKind {
     }
 }
 
+// 描述谓词参数的结构体
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PredParameter {
-    pub kind: FnSpecKind,
-    pub name: String,
+    pub kind: FnSpecKind,   // 函数规范类型
+    pub name: String,       // 参数名称
 }
 impl Default for PredParameter {
     fn default() -> Self {
@@ -169,27 +182,28 @@ pub struct PredArgument {
     pub target: PredParameter,
 }
 
+// 表达式的枚举类型
 #[derive(Debug, Clone)]
 pub enum Expr {
     // Never,
-    Var(String),
-    // Futures deref of snapshot
-    Snap(Vec<bool>, String),
-    // Futures, ty, field?
-    OnExpiry(Vec<bool>, FnSpecKind, String, Result<usize, String>),
-    // true -> is set, false -> is tuple
-    Tuple(bool, Vec<Expr>),
-    Lit(Lit),
-    BinOp(BinOp, Box<Expr>, Box<Expr>),
-    UnOp(UnOp, Box<Expr>),
-    IfElse(Box<Expr>, Box<Expr>, Box<Expr>),
+    Var(String),                      // 变量
+    Snap(Vec<bool>, String),          // 快照类型
+    OnExpiry(Vec<bool>, FnSpecKind, String, Result<usize, String>), // 到期操作
+    Tuple(bool, Vec<Expr>),           // 元组类型
+    Lit(Lit),                         // 文字
+    BinOp(BinOp, Box<Expr>, Box<Expr>), // 二元操作
+    UnOp(UnOp, Box<Expr>),            // 一元操作
+    IfElse(Box<Expr>, Box<Expr>, Box<Expr>), // If-Else表达式
 }
 
+// 描述一个断言的结构体，包括phi和sigma两个部分
 pub struct Assertion {
     pub phi: Phi,
     pub sigma: Sigma,
 }
+
 impl Assertion {
+    // 创建一个空的断言
     pub fn empty() -> Self {
         Self {
             phi: Phi::empty(),
@@ -197,25 +211,34 @@ impl Assertion {
         }
     }
 }
+// 描述phi部分的结构体，包含一个表达式向量
 #[derive(Debug, Clone)]
 pub struct Phi(pub Vec<Expr>);
+
 impl Phi {
-    pub fn empty() -> Self {
-        Self(Vec::new())
-    }
-}
-pub struct Sigma(pub Vec<SApp>);
-impl Sigma {
+    // 创建一个空的phi
     pub fn empty() -> Self {
         Self(Vec::new())
     }
 }
 
+// 描述sigma部分的结构体，包含一个SApp向量
+pub struct Sigma(pub Vec<SApp>);
+impl Sigma {
+    // 创建一个空的sigma
+    pub fn empty() -> Self {
+        Self(Vec::new())
+    }
+}
+
+// 描述一个不受支持的情况的结构体
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Unsupported {
-    pub in_main: bool,
-    pub reason: Reason,
+    pub in_main: bool, // 是否在主函数中
+    pub reason: Reason, // 不受支持的原因
 }
+
+// 描述不受支持的原因的枚举
 #[derive(serde::Serialize, serde::Deserialize, Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Reason {
     UnnamedArgs,
@@ -231,11 +254,14 @@ pub enum Reason {
     OtherTy,
 }
 
+// 描述合成结果的结构体
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct SynthesisResult {
-    pub is_trivial: bool,
-    pub kind: SynthesisResultKind,
+    pub is_trivial: bool,              // 是否是一个简单结果
+    pub kind: SynthesisResultKind,    // 合成结果的具体类型
 }
+
+// 描述合成结果类型的枚举
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum SynthesisResultKind {
     Unsupported(Unsupported),
@@ -243,7 +269,9 @@ pub enum SynthesisResultKind {
     Timeout,
     Solved(Solved),
 }
+
 impl SynthesisResult {
+    // 获取已解决的合成结果
     pub fn get_solved(&self) -> Option<&Solved> {
         if let SynthesisResultKind::Solved(sln) = &self.kind {
             Some(sln)
@@ -251,6 +279,8 @@ impl SynthesisResult {
             None
         }
     }
+
+    // 获取不受支持的合成结果
     pub fn get_unsupported(&self) -> Option<&Unsupported> {
         if let SynthesisResultKind::Unsupported(u) = &self.kind {
             Some(u)
@@ -258,6 +288,8 @@ impl SynthesisResult {
             None
         }
     }
+
+    // 获取不可解的合成结果
     pub fn get_unsolvable(&self) -> Option<u64> {
         if let SynthesisResultKind::Unsolvable(u) = &self.kind {
             Some(*u)
@@ -265,19 +297,27 @@ impl SynthesisResult {
             None
         }
     }
+
+    // 判断是否为超时的合成结果
     pub fn is_timeout(&self) -> bool {
         matches!(self.kind, SynthesisResultKind::Timeout)
     }
 }
+
+// 定义一个使用纯函数的类型别名
 pub type UsedPureFns = FxHashMap<String, (bool, usize)>;
+
+// 描述一个已解决的合成结果的结构体
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Solved {
-    pub exec_time: u64,
-    pub synth_ast: usize,
-    pub pure_fn_ast: UsedPureFns,
-    pub slns: Vec<Solution>,
+    pub exec_time: u64,          // 执行时间
+    pub synth_ast: usize,        // 合成抽象语法树的大小
+    pub pure_fn_ast: UsedPureFns, // 使用的纯函数抽象语法树
+    pub slns: Vec<Solution>,    // 解决方案向量
 }
+
 impl Solved {
+    // 创建一个新的已解决的合成结果
     fn new(exec_time: u64, synth_ast: usize, pure_fn_ast: UsedPureFns, sln: String) -> Self {
         let idx = &mut 0;
         let slns: Vec<_> = sln
@@ -291,6 +331,8 @@ impl Solved {
             slns,
         }
     }
+
+    // 打印已解决的合成结果
     pub fn print(&self) {
         let min_lines_print = std::env::var("RUSLIC_PRINT_SLN_ABOVE")
             .map(|v| v.parse::<usize>().unwrap())
@@ -305,15 +347,19 @@ impl Solved {
         }
     }
 }
+// 代表平均统计数据的结构体
+// 代表平均统计数据的结构体
 pub struct MeanStats {
-    pub synth_time: f64,
-    pub loc: f64,
-    pub spec_ast: f64,
-    pub ast_nodes: f64,
-    pub ast_nodes_unsimp: f64,
-    pub rule_apps: f64,
+    pub synth_time: f64,           // 合成时间
+    pub loc: f64,                  // 代码行数
+    pub spec_ast: f64,             // AST（抽象语法树）规格
+    pub ast_nodes: f64,            // AST节点数量
+    pub ast_nodes_unsimp: f64,     // 未简化的AST节点数量
+    pub rule_apps: f64,            // 规则应用数量
 }
+
 impl MeanStats {
+    // 创建新的MeanStats实例
     fn new() -> Self {
         Self {
             synth_time: 0.,
@@ -324,10 +370,14 @@ impl MeanStats {
             rule_apps: 0.,
         }
     }
+
+    // 从多个解决方案中计算统计数据
     pub fn calculate<'a>(many_slns: impl Iterator<Item = &'a Solved>) -> (UsedPureFns, Vec<Self>) {
         let mut count = Vec::new();
         let mut sums = Vec::new();
         let mut pure_fns = FxHashMap::default();
+
+        // 遍历解决方案，并累计统计数据
         for solved in many_slns {
             for (k, &v) in &solved.pure_fn_ast {
                 if let Some(&pfn) = pure_fns.get(k) {
@@ -352,6 +402,8 @@ impl MeanStats {
                 sums[idx].rule_apps += sln.rule_apps as f64;
             }
         }
+
+        // 计算均值
         for (sum, count) in sums.iter_mut().zip(count) {
             sum.synth_time /= count;
             sum.loc /= count;
@@ -360,20 +412,25 @@ impl MeanStats {
             sum.ast_nodes_unsimp /= count;
             sum.rule_apps /= count;
         }
+
         (pure_fns, sums)
     }
 }
+
+// 代表单个解决方案的结构体
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Solution {
-    pub code: String,
-    pub loc: usize,
-    pub synth_time: u64,
-    pub ast_nodes: u64,
-    pub ast_nodes_unsimp: u64,
-    pub rule_apps: u64,
-    pub idx: usize,
+    pub code: String,          // 解决方案的代码
+    pub loc: usize,            // 代码行数
+    pub synth_time: u64,       // 合成时间
+    pub ast_nodes: u64,        // AST节点数量
+    pub ast_nodes_unsimp: u64, // 未简化的AST节点数量
+    pub rule_apps: u64,        // 规则应用数量
+    pub idx: usize,            // 解决方案的索引
 }
+
 impl Solution {
+    // 根据代码和索引创建新的解决方案实例
     fn new(code: &str, idx: &mut usize) -> Option<Self> {
         let loc = code.lines().count();
         if loc <= 2 {
@@ -401,7 +458,8 @@ impl Solution {
 }
 
 impl SuslikProgram {
-    /// Timeout in ms
+    /// 尝试解决给定的函数签名，可能会有超时限制。
+    /// 超时时间以毫秒为单位
     pub fn solve<'tcx>(
         tcx: TyCtxt<'tcx>,
         sig: RuslikFnSig<'tcx>,
@@ -409,17 +467,24 @@ impl SuslikProgram {
         extern_fns: &Vec<RuslikFnSig<'tcx>>,
         timeout: u64,
     ) -> Option<SynthesisResult> {
+        // 构建或找到Suslik的路径
         let suslik_dir = Self::sbt_build_suslik();
+        // 克隆函数参数
         let params = sig.params.clone();
+        // 检查该函数签名是否是简单的（无法进一步分解的）
         let is_trivial = sig.is_trivial();
+
+        // 尝试从给定的函数签名创建一个Suslik程序
         match Self::from_fn_sig(tcx, pure_fns, extern_fns, sig) {
-            Ok(sp) => sp.send_to_suslik(suslik_dir, &params, timeout),
-            Err(err) => Some(SynthesisResult {
+            Ok(sp) => sp.send_to_suslik(suslik_dir, &params, timeout),  // 如果成功，发送给Suslik求解
+            Err(err) => Some(SynthesisResult {   // 如果失败，返回一个表示不受支持的结果
                 is_trivial,
                 kind: SynthesisResultKind::Unsupported(err),
             }),
         }
     }
+
+    /// 在一个新的线程中解决给定的函数签名
     pub fn solve_in_thread<'tcx>(
         tx: Sender<(usize, Option<SynthesisResult>)>,
         id: usize,
@@ -429,11 +494,17 @@ impl SuslikProgram {
         extern_fns: &Vec<RuslikFnSig<'tcx>>,
         timeout: u64,
     ) {
+        // 构建或找到Suslik的路径
         let suslik_dir = Self::sbt_build_suslik();
+        // 克隆函数参数
         let params = sig.params.clone();
+        // 检查该函数签名是否是简单的
         let is_trivial = sig.is_trivial();
         let sus_prog = Self::from_fn_sig(tcx, pure_fns, extern_fns, sig);
+
+        // 创建新线程
         std::thread::spawn(move || {
+            // 根据前面的结果来尝试求解
             let result = match sus_prog {
                 Ok(sp) => sp.send_to_suslik(suslik_dir, &params, timeout),
                 Err(err) => Some(SynthesisResult {
@@ -441,15 +512,19 @@ impl SuslikProgram {
                     kind: SynthesisResultKind::Unsupported(err),
                 }),
             };
+            // 通过发送者发送结果
             tx.send((id, result)).unwrap();
         });
     }
+
+    /// 找到或构建Suslik的路径
     fn sbt_build_suslik() -> PathBuf {
-        // Find suslik dir
+        // 首先尝试找到suslik的目录
         let suslik_dir = std::env::var("SUSLIK_DIR")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|_| {
                 let mut suslik_dir = std::env::current_exe().unwrap();
+                // 寻找存在的suslik目录
                 while {
                     suslik_dir.push("suslik");
                     !suslik_dir.exists()
@@ -459,6 +534,7 @@ impl SuslikProgram {
                         break;
                     }
                 }
+                // 如果上述方法失败，尝试从当前目录查找suslik目录
                 if suslik_dir.parent().is_none() {
                     suslik_dir = std::env::current_dir().unwrap();
                     while {
@@ -475,15 +551,16 @@ impl SuslikProgram {
                 }
                 suslik_dir
             });
-        // Find suslik exe
+        // 然后查找suslik的可执行文件
         let mut jar_file = suslik_dir.clone();
         jar_file.extend(["target", "scala-2.12", "suslik.jar"]);
         if !jar_file.is_file() {
-            // Need to assmble jar file
+            // 如果找不到，需要组装jar文件
             println!(
                 "Running `sbt assembly` since there is no executable at {}",
                 jar_file.to_string_lossy()
             );
+            // 构建和运行sbt命令
             let mut assembly = Command::new(if cfg!(windows) { "cmd" } else { "sbt" });
             if cfg!(windows) {
                 assembly.arg("/c").arg("sbt");
@@ -503,30 +580,31 @@ impl SuslikProgram {
         suslik_dir
     }
 
+
     fn send_to_suslik(
         &self,
         suslik_dir: PathBuf,
         params: &str,
         timeout: u64,
     ) -> Option<SynthesisResult> {
-        // Write program to tmp file
+        // Write program to tmp file // 将程序写入临时文件
         let data = format!("# -c 10 -o 10 -p false\n###\n{}", self);
         let mut tmp = suslik_dir.clone();
 
-        use rand::Rng;
+        use rand::Rng; // 生成随机数作为临时目录名的一部分
         let num = rand::thread_rng().gen_range(0..10000);
         let tmpdir = std::path::PathBuf::from(format!("tmp-{}-{num}", self.synth_fn.unique_name));
         std::fs::create_dir_all(suslik_dir.join(&tmpdir)).unwrap();
         let synfile = tmpdir.join(std::path::PathBuf::from("tmp.syn"));
         tmp.push(&synfile);
         std::fs::write(tmp.clone(), data).expect("Unable to write file");
-        // Run suslik on tmp file
+        // Run suslik on tmp file  // 在临时文件上运行suslik
         let mut provided_args = params
             .split(' ')
             .filter(|a| !a.is_empty())
             .map(String::from)
             .collect::<Vec<_>>();
-        if provided_args.iter().all(|a| !a.contains("--solutions=")) {
+        if provided_args.iter().all(|a| !a.contains("--solutions=")) { // 如果参数中没有包含 "--solutions="，则添加它
             provided_args.push("--solutions=1".to_string());
         }
         let output_trace = std::env::var("RUSLIC_OUTPUT_TRACE")
@@ -554,7 +632,7 @@ impl SuslikProgram {
         let (intime, exit_status, time) = match child.wait_timeout(max).expect("sbt crashed?") {
             Some(status) => (true, status, start.elapsed()),
             None => {
-                // child hasn't exited yet
+                // child hasn't exited yet  // 子进程尚未退出
                 child.kill().unwrap();
                 println!("Failed to synthesize fn after {}ms!", timeout);
                 (false, child.wait().unwrap(), max)
@@ -571,7 +649,7 @@ impl SuslikProgram {
                 exit_status, self.synth_fn.fn_name
             );
             None
-        } else {
+        } else { // 解析 suslik 的输出结果并返回相应的结构体
             Some(if !intime {
                 SynthesisResult {
                     is_trivial: self.synth_fn.is_trivial,
@@ -601,18 +679,28 @@ impl SuslikProgram {
         }
     }
 
+    // 从给定的函数签名创建新的实例
     fn from_fn_sig<'a, 'tcx>(
-        tcx: TyCtxt<'tcx>,
-        pure_fns: &'a PureFnMap<'tcx>,
-        extern_fns: &Vec<RuslikFnSig<'tcx>>,
-        sig: RuslikFnSig<'tcx>,
+        tcx: TyCtxt<'tcx>, // 类型上下文
+        pure_fns: &'a PureFnMap<'tcx>, // 纯函数的映射
+        extern_fns: &Vec<RuslikFnSig<'tcx>>, // 外部函数的列表
+        sig: RuslikFnSig<'tcx>, // 当前的函数签名
     ) -> Result<Self, Unsupported> {
+
+        // 从给定的函数签名提取 def_id 和 ast_nodes
         let def_id = sig.def_id;
         let ast_nodes = sig.ast_nodes;
+
+        // 创建一个默认的 FxHashMap
         let mut map = FxHashMap::default();
+
+        // 从给定的函数签名、纯函数映射和 map 中提取签名
         let ssig = Signature::from_fn_sig(tcx, pure_fns, sig, &mut map)?;
+
+        // 查找与 def_id 和 ssig.tys 相关的 trait 函数
         let trait_fns = find_trait_fns(tcx, def_id, &ssig.tys);
 
+        // 对于每个 trait 函数，尝试从函数签名映射中提取签名，并收集所有有效的签名
         let mut efns = trait_fns
             .into_iter()
             .flat_map(|tf| {
@@ -621,18 +709,23 @@ impl SuslikProgram {
                     .ok()
             })
             .collect::<Vec<Signature>>();
+
+        // 创建一个泛型收集器实例
         let sgc = SGenericsCollector {
             tcx,
             synth_tys: ssig.tys,
         };
+
+        // 对于每个外部函数，找到所有子函数并为其创建新的签名
         for efn in extern_fns {
             for (gens, efn) in sgc.find_subs_for_ext_fns(efn) {
                 let mut sig = Signature::from_fn_sig_map(tcx, pure_fns, efn, &mut map, false)?;
-                sig.sig.unique_name = sig.sig.unique_name + "_" + &gens;
-                efns.push(sig.sig);
+                sig.sig.unique_name = sig.sig.unique_name + "_" + &gens; // 修改 unique_name
+                efns.push(sig.sig); // 将新签名添加到 efns 列表中
             }
         }
 
+        // 使用收集的数据创建结果实例
         let mut res = Self {
             pred_map: map,
             extern_fns: efns,
@@ -649,18 +742,23 @@ impl SuslikProgram {
                 })
                 .collect(),
         };
-        res.normalize();
-        Ok(res)
+        
+        res.normalize(); // 规范化结果实例
+        Ok(res) // 返回成功创建的实例
     }
 }
 
+
+// 定义一个结构 SignatureSuccess，它包含三个字段。
 pub struct SignatureSuccess<'a, 'tcx> {
-    sig: Signature,
-    tys: FxHashSet<rustc_middle::ty::Ty<'tcx>>,
-    used_pure_fns: Vec<&'a PureFn<'tcx>>,
+    sig: Signature,                               // 一个Signature类型的字段。
+    tys: FxHashSet<rustc_middle::ty::Ty<'tcx>>,   // 使用FxHashSet存储类型集合。
+    used_pure_fns: Vec<&'a PureFn<'tcx>>,         // 存储被使用的纯函数的集合。
 }
 
+// 对结构Signature的实现。
 impl Signature {
+     // 定义一个公共函数 from_fn_sig。
     pub fn from_fn_sig<'a, 'tcx>(
         tcx: TyCtxt<'tcx>,
         pure_fns: &'a PureFnMap<'tcx>,
@@ -669,6 +767,7 @@ impl Signature {
     ) -> Result<SignatureSuccess<'a, 'tcx>, Unsupported> {
         Self::from_fn_sig_map(tcx, pure_fns, sig, map, true)
     }
+    // 定义一个公共函数 from_fn_sig_map。
     pub fn from_fn_sig_map<'a, 'tcx>(
         tcx: TyCtxt<'tcx>,
         pure_fns: &'a PureFnMap<'tcx>,
@@ -676,13 +775,16 @@ impl Signature {
         map: &mut PredMap,
         in_main: bool,
     ) -> Result<SignatureSuccess<'a, 'tcx>, Unsupported> {
+         // 检查环境变量 "RUSLIC_USE_FULL_NAMES" 的值
         let use_full_names = std::env::var("RUSLIC_USE_FULL_NAMES")
             .map(|v| v.parse::<bool>().unwrap())
             .unwrap_or(false);
+        // 检查环境变量 "RUSLIC_OPTIMISTICALLY_ALLOW_PRIVATE_TYPES" 的值。
         let optimistically_allow_private_types =
             std::env::var("RUSLIC_OPTIMISTICALLY_ALLOW_PRIVATE_TYPES")
                 .map(|v| v.parse::<bool>().unwrap())
                 .unwrap_or(false);
+        // 初始化一个 STyTranslator 结构的实例。
         let mut stt = STyTranslator {
             use_full_names,
             optimistically_allow_private_types,
@@ -691,13 +793,16 @@ impl Signature {
             tys: FxHashSet::default(),
             fn_id: sig.def_id,
         };
+         // 检查函数的参数中是否有任何没有 UUID 的参数
         if sig.args.iter().any(|(v, _)| v.uuid().is_empty()) {
+            // 如果有，则返回一个错误：不支持这样的函数。
             // functions with args (_: i32, Struct { f }: Struct) not supported
             return Err(Unsupported {
                 in_main,
                 reason: Reason::UnnamedArgs,
             });
         }
+        // 对函数的每个参数进行转换。
         let sigma = Sigma(
             sig.args
                 .iter()
@@ -708,11 +813,13 @@ impl Signature {
                 .collect::<Result<_, _>>()
                 .map_err(|reason| Unsupported { in_main, reason })?,
         );
+        // 初始化一个 Assertion 结构的实例。
         let mut pre = Assertion {
             phi: Phi::empty(),
             sigma,
         };
         let mut used_pure_fns = Vec::new();
+          // 初始化一个 ExprTranslator 结构的实例。
         let mut et = ExprTranslator {
             tcx,
             pre: &mut pre,
@@ -724,6 +831,7 @@ impl Signature {
             under_cond: Vec::new(),
             used_pure_fns: &mut used_pure_fns,
         };
+        // 将 pure_pre 表达式转换为其等效的 Phi 表达式。
         let expr = et.translate_expr(&sig.pure_pre, Vec::new(), None);
         pre.phi.0.extend(expr.flatten());
 
@@ -790,6 +898,7 @@ impl Signature {
             unique_name: crate::suslik_translate::sanitize(&tcx.def_path_str(sig.def_id)),
             fn_name,
         };
+         // 根据上面的计算和转换，构建并返回一个 SignatureSuccess 实例
         Ok(SignatureSuccess {
             sig,
             tys: stt.tys,
@@ -799,30 +908,41 @@ impl Signature {
 }
 
 impl Expr {
+     // 将表达式展平为一个 Vec<Self>（向量）。主要处理`And`二元操作。
     pub fn flatten(self) -> Vec<Self> {
         match self {
+             // 如果表达式是二元操作且操作是`And`
             Expr::BinOp(BinOp::Rust(RustBinOp::And), l, r) => {
+                 // 展平左子表达式
                 let mut l = l.flatten();
+                // 将右子表达式的展平结果追加到左子表达式的展平结果后
                 l.extend(r.flatten());
                 l
             }
+             // 其他类型的表达式直接放入向量中
             other => vec![other],
         }
     }
+     // 更新表达式中的变量名。接受一个函数`f`作为参数，该函数对变量名执行某些操作。
     pub fn update_vars<F: Fn(&mut String)>(&mut self, f: &F) {
         match self {
+            // 对于这些类型的表达式，应用函数`f`来更新变量`v`
             Expr::Var(v) | Expr::Snap(_, v) | Expr::OnExpiry(_, _, v, _) => f(v),
+            // 对于元组表达式，递归更新每一个子表达式
             Expr::Tuple(_, es) => {
                 for e in es {
                     e.update_vars(f)
                 }
             }
+            // 对于字面量表达式，什么也不做
             Expr::Lit(_) => (),
+             // 对于二元操作，递归更新左右子表达式
             Expr::BinOp(_, l, r) => {
                 l.update_vars(f);
                 r.update_vars(f);
             }
             Expr::UnOp(_, e) => e.update_vars(f),
+            // 对于条件表达式，递归更新条件、真值子表达式和假值子表达式
             Expr::IfElse(b, t, e) => {
                 b.update_vars(f);
                 t.update_vars(f);
@@ -830,6 +950,7 @@ impl Expr {
             }
         }
     }
+     // 如果表达式中的变量名为 "fresult"，则使用 `e_new` 替换该表达式
     pub fn update_result(&mut self, e_new: &Self) {
         match self {
             Expr::Var(v) | Expr::Snap(_, v) | Expr::OnExpiry(_, _, v, _) => {
@@ -855,8 +976,10 @@ impl Expr {
             }
         }
     }
+    // 更改变量名。该函数接受一个函数`f`作为参数，该函数根据当前变量名可能返回一个新的表达式。
     pub fn change_var<F: Fn(&str) -> Option<Expr>>(&mut self, f: &F) {
         match self {
+            // 对于变量表达式，应用函数`f`，如果返回了新的表达式，则用新表达式替换当前表达式
             Expr::Var(v) => {
                 if let Some(new) = f(v) {
                     *self = new;

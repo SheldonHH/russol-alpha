@@ -11,14 +11,20 @@ use crate::{
     ruslik_types::RuslikFnSig,
 };
 
+// 定义 SubstFolder 结构，用于对类型进行替换
 pub struct SubstFolder<'a, 'tcx> {
-    pub tcx: TyCtxt<'tcx>,
-    pub subst: Box<dyn Fn(ParamTy) -> Ty<'tcx> + 'a>,
+    pub tcx: TyCtxt<'tcx>,  // 类型上下文
+    pub subst: Box<dyn Fn(ParamTy) -> Ty<'tcx> + 'a>,  // 替换函数
 }
+
+// 为 SubstFolder 实现 TypeFolder trait
 impl<'a, 'tcx> TypeFolder<'tcx> for SubstFolder<'a, 'tcx> {
+    // 获取类型上下文
     fn tcx<'b>(&'b self) -> TyCtxt<'tcx> {
         self.tcx
     }
+    
+    // 对类型进行替换处理
     fn fold_ty(&mut self, t: Ty<'tcx>) -> Ty<'tcx> {
         if !t.needs_subst() {
             t
@@ -30,6 +36,7 @@ impl<'a, 'tcx> TypeFolder<'tcx> for SubstFolder<'a, 'tcx> {
         }
     }
 }
+// 提供一些辅助函数，用于创建 SubstFolder 实例
 impl<'a, 'tcx: 'a> SubstFolder<'a, 'tcx> {
     pub fn from_gens(tcx: TyCtxt<'tcx>, substs: &'a FxHashMap<u32, Ty<'tcx>>) -> Self {
         SubstFolder {
@@ -44,11 +51,11 @@ impl<'a, 'tcx: 'a> SubstFolder<'a, 'tcx> {
         }
     }
 }
-
+// 定义 TyFoldable trait，为类型提供替换功能
 pub trait TyFoldable<'tcx> {
     fn subst<F: TypeFolder<'tcx>>(&mut self, folder: &mut F);
 }
-
+// 为几种类型实现 TyFoldable trait
 impl<'tcx> TyFoldable<'tcx> for Ty<'tcx> {
     fn subst<F: TypeFolder<'tcx>>(&mut self, folder: &mut F) {
         *self = folder.fold_ty(*self)
@@ -71,16 +78,18 @@ impl<'tcx> TyFoldable<'tcx> for RuslikFnSig<'tcx> {
         folder.walk_expr_mut(&mut self.pure_post);
     }
 }
-
+// 定义 SubstFinder 结构，用于查找替换的类型
 pub struct SubstFinder<'tcx> {
     pub param_subs: FxHashMap<u32, Ty<'tcx>>,
 }
 impl<'tcx> SubstFinder<'tcx> {
+      // 创建一个新的 SubstFinder 实例
     fn new() -> Self {
         Self {
             param_subs: FxHashMap::default(),
         }
     }
+     // 递归访问两种类型，并尝试进行匹配和替换
     fn visit_ty_tuple(&mut self, l: Ty<'tcx>, r: Ty<'tcx>) -> Result<(), ()> {
         match (l.kind(), r.kind()) {
             (TyKind::Adt(l, ls), TyKind::Adt(r, rs)) if l == r => {
